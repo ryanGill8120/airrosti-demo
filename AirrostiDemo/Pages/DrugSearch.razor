@@ -1,0 +1,203 @@
+@page "/drugs"
+@using AirrostiDemo.Shared.OpenFda
+@inject HttpClient Http
+@inject AuthService Auth
+
+<PageTitle>Drug Side Effects</PageTitle>
+
+<h1>Drug Side Effects Explorer</h1>
+
+<p>
+    Reaction counts for pain medications, sourced live from the FDA's
+    <a href="https://open.fda.gov/apis/drug/event/" target="_blank" rel="noopener">adverse event reporting system</a>.
+</p>
+
+<div class="mb-3">
+    <label class="form-label" for="drug-input">Drug name</label>
+    <input id="drug-input" class="form-control" @bind="drugInput" @bind:event="oninput"
+           @onkeydown="OnKey" placeholder="e.g. ibuprofen" />
+</div>
+
+<div class="mb-3">
+    <div class="form-text mb-2">Quick picks:</div>
+    @foreach (var drug in DemoDrugs)
+    {
+        <button type="button" class="btn btn-outline-primary me-2 mb-2"
+                @onclick="() => Search(drug)" disabled="@loading">
+            @drug
+        </button>
+    }
+</div>
+
+<button type="button" class="btn btn-primary"
+        @onclick="() => Search(drugInput)"
+        disabled="@(loading || string.IsNullOrWhiteSpace(drugInput))">
+    Search
+</button>
+
+@if (loading)
+{
+    <p class="mt-3"><em>Loading...</em></p>
+}
+else if (error is not null)
+{
+    <div class="alert alert-danger mt-3" role="alert">@error</div>
+}
+else if (response is not null)
+{
+    <h3 class="mt-4">Top reactions for @response.DrugName</h3>
+    @if (response.Results.Count == 0)
+    {
+        <p>No reactions reported for that drug.</p>
+    }
+    else
+    {
+        var max = response.Results.Max(r => r.Count);
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Reaction</th>
+                    <th style="width:20%">Reports</th>
+                    <th>Frequency</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var r in response.Results)
+                {
+                    var pct = max == 0 ? 0 : (int)Math.Round(r.Count / (double)max * 100);
+                    <tr>
+                        <td>@r.Term</td>
+                        <td>@r.Count.ToString("N0")</td>
+                        <td>
+                            <div class="progress" style="height:1rem">
+                                <div class="progress-bar" role="progressbar"
+                                     style="width:@(pct)%"
+                                     aria-valuenow="@pct" aria-valuemin="0" aria-valuemax="100">
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+        <div class="d-flex align-items-center gap-3 mt-3">
+            <button type="button" class="btn btn-success"
+                    @onclick="SaveAsync" disabled="@saving">
+                Save my results
+            </button>
+            @if (saveStatus is not null)
+            {
+                <span class="@(saveStatus.StartsWith("error") ? "text-danger" : "text-success")">
+                    @saveStatus
+                </span>
+            }
+        </div>
+    }
+}
+
+<AuthModal Show="@showAuthModal"
+           OnClose="() => showAuthModal = false"
+           OnAuthenticated="OnAuthenticatedAsync" />
+
+@code {
+    private static readonly string[] DemoDrugs = new[]
+    {
+        "ibuprofen",
+        "naproxen",
+        "oxycodone",
+        "acetaminophen",
+        "tramadol",
+        "celecoxib",
+    };
+
+    private string drugInput = string.Empty;
+    private bool loading;
+    private string? error;
+    private FdaCountResponse? response;
+
+    private bool showAuthModal;
+    private bool saving;
+    private string? saveStatus;
+
+    private async Task Search(string drug)
+    {
+        if (string.IsNullOrWhiteSpace(drug)) return;
+
+        loading = true;
+        error = null;
+        response = null;
+        saveStatus = null;
+        drugInput = drug;
+
+        try
+        {
+            response = await Http.GetFromJsonAsync<FdaCountResponse>(
+                $"api/DrugSideEffects/{Uri.EscapeDataString(drug)}");
+        }
+        catch (Exception ex)
+        {
+            error = $"Failed to fetch data: {ex.Message}";
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private async Task OnKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await Search(drugInput);
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        if (response is null) return;
+
+        if (!await Auth.IsAuthenticatedAsync())
+        {
+            showAuthModal = true;
+            return;
+        }
+
+        await PostReportAsync();
+    }
+
+    private async Task OnAuthenticatedAsync()
+    {
+        showAuthModal = false;
+        await PostReportAsync();
+    }
+
+    private async Task PostReportAsync()
+    {
+        if (response is null) return;
+
+        saving = true;
+        saveStatus = null;
+        try
+        {
+            var resp = await Http.PostAsJsonAsync("api/Reports", response);
+            if (resp.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                await Auth.LogoutAsync();
+                saveStatus = "error: session expired, please log in again";
+                showAuthModal = true;
+                return;
+            }
+            resp.EnsureSuccessStatusCode();
+            saveStatus = "Saved.";
+        }
+        catch (Exception ex)
+        {
+            saveStatus = $"error: {ex.Message}";
+        }
+        finally
+        {
+            saving = false;
+        }
+    }
+}

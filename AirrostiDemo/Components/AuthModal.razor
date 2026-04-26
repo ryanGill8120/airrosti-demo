@@ -1,0 +1,134 @@
+@using AirrostiDemo.Services
+@using AirrostiDemo.Shared.Auth
+@inject AuthService Auth
+
+@if (Show)
+{
+    <div class="modal show d-block" tabindex="-1" role="dialog"
+         style="background: rgba(0, 0, 0, 0.5);">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <ul class="nav nav-tabs card-header-tabs">
+                        <li class="nav-item">
+                            <button type="button"
+                                    class="nav-link @(mode == Mode.Login ? "active" : "")"
+                                    @onclick="() => SetMode(Mode.Login)">
+                                Log in
+                            </button>
+                        </li>
+                        <li class="nav-item">
+                            <button type="button"
+                                    class="nav-link @(mode == Mode.Register ? "active" : "")"
+                                    @onclick="() => SetMode(Mode.Register)">
+                                Register
+                            </button>
+                        </li>
+                    </ul>
+                    <button type="button" class="btn-close" aria-label="Close" @onclick="HandleCloseAsync"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label" for="auth-email">Email</label>
+                        <input id="auth-email" type="email" class="form-control"
+                               @bind="email" @bind:event="oninput" autocomplete="email" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" for="auth-password">Password</label>
+                        <input id="auth-password" type="password" class="form-control"
+                               @bind="password" @bind:event="oninput"
+                               autocomplete="@(mode == Mode.Login ? "current-password" : "new-password")" />
+                        @if (mode == Mode.Register)
+                        {
+                            <div class="form-text">Minimum 6 characters.</div>
+                        }
+                    </div>
+                    @if (error is not null)
+                    {
+                        <div class="alert alert-danger" role="alert">@error</div>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary"
+                            @onclick="HandleCloseAsync" disabled="@busy">
+                        Cancel
+                    </button>
+                    <button type="button" class="btn btn-primary"
+                            @onclick="SubmitAsync"
+                            disabled="@(busy || string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))">
+                        @(mode == Mode.Login ? "Log in" : "Register")
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private enum Mode { Login, Register }
+
+    [Parameter] public bool Show { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public EventCallback OnAuthenticated { get; set; }
+
+    private Mode mode = Mode.Login;
+    private string email = string.Empty;
+    private string password = string.Empty;
+    private string? error;
+    private bool busy;
+
+    private void SetMode(Mode m)
+    {
+        mode = m;
+        error = null;
+    }
+
+    private async Task SubmitAsync()
+    {
+        busy = true;
+        error = null;
+        try
+        {
+            if (mode == Mode.Register)
+            {
+                var (regOk, regErr) = await Auth.RegisterAsync(new RegisterDto
+                {
+                    Email = email,
+                    Password = password,
+                });
+                if (!regOk)
+                {
+                    error = regErr ?? "Registration failed.";
+                    return;
+                }
+            }
+
+            var (loginOk, loginErr) = await Auth.LoginAsync(new LoginDto
+            {
+                Email = email,
+                Password = password,
+            });
+            if (!loginOk)
+            {
+                error = loginErr ?? "Login failed.";
+                return;
+            }
+
+            await OnAuthenticated.InvokeAsync();
+            await HandleCloseAsync();
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    private async Task HandleCloseAsync()
+    {
+        email = string.Empty;
+        password = string.Empty;
+        error = null;
+        mode = Mode.Login;
+        await OnClose.InvokeAsync();
+    }
+}

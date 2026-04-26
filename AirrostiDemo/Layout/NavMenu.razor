@@ -1,0 +1,85 @@
+@using AirrostiDemo.Services
+@inject AuthService Auth
+@implements IDisposable
+
+<div class="top-row ps-3 navbar navbar-dark">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="">AirrostiDemo</a>
+        <button title="Navigation menu" class="navbar-toggler" @onclick="ToggleNavMenu">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+    </div>
+</div>
+
+<div class="@NavMenuCssClass nav-scrollable" @onclick="ToggleNavMenu">
+    <nav class="flex-column">
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Home
+            </NavLink>
+        </div>
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="counter">
+                <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span> Counter
+            </NavLink>
+        </div>
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="weather">
+                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Weather
+            </NavLink>
+        </div>
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="drugs">
+                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Drug Search
+            </NavLink>
+        </div>
+        @if (authed)
+        {
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="my-reports">
+                    <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> My Reports
+                </NavLink>
+            </div>
+            <div class="nav-item px-3">
+                <button type="button" class="nav-link btn btn-link text-start"
+                        @onclick="LogoutAsync">
+                    <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Log out
+                </button>
+            </div>
+        }
+    </nav>
+</div>
+
+@code {
+    private bool collapseNavMenu = true;
+    private bool authed;
+
+    private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Auth.AuthStateChanged += HandleAuthChanged;
+        authed = await Auth.IsAuthenticatedAsync();
+    }
+
+    private void ToggleNavMenu()
+    {
+        collapseNavMenu = !collapseNavMenu;
+    }
+
+    private async Task LogoutAsync()
+    {
+        await Auth.LogoutAsync();
+    }
+
+    private async void HandleAuthChanged()
+    {
+        authed = await Auth.IsAuthenticatedAsync();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        Auth.AuthStateChanged -= HandleAuthChanged;
+    }
+}

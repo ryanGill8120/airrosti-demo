@@ -1,0 +1,127 @@
+@page "/my-reports"
+@using AirrostiDemo.Components
+@using AirrostiDemo.Services
+@using AirrostiDemo.Shared.Reports
+@inject HttpClient Http
+@inject AuthService Auth
+@implements IDisposable
+
+<PageTitle>My Reports</PageTitle>
+
+<h1>My Reports</h1>
+
+@if (loading)
+{
+    <p><em>Loading...</em></p>
+}
+else if (!authed)
+{
+    <p>You need to log in to see your saved reports.</p>
+    <button class="btn btn-primary" @onclick="() => showAuthModal = true">Log in or register</button>
+}
+else if (error is not null)
+{
+    <div class="alert alert-danger" role="alert">@error</div>
+}
+else if (reports is null || reports.Count == 0)
+{
+    <p>You haven't saved any reports yet. Try the
+        <a href="drugs">Drug Search</a> page and click "Save my results".</p>
+}
+else
+{
+    @foreach (var r in reports)
+    {
+        <div class="card mb-3">
+            <div class="card-body">
+                <h5 class="card-title">
+                    @r.DrugName
+                    <small class="text-muted">— saved @r.SavedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</small>
+                </h5>
+                @if (r.Report.Results.Count == 0)
+                {
+                    <p class="card-text text-muted">No reactions recorded.</p>
+                }
+                else
+                {
+                    <ol class="mb-0">
+                        @foreach (var reaction in r.Report.Results.Take(3))
+                        {
+                            <li>@reaction.Term — @reaction.Count.ToString("N0") reports</li>
+                        }
+                    </ol>
+                }
+            </div>
+        </div>
+    }
+}
+
+<AuthModal Show="@showAuthModal"
+           OnClose="() => showAuthModal = false"
+           OnAuthenticated="OnAuthenticatedAsync" />
+
+@code {
+    private bool loading = true;
+    private bool authed;
+    private bool showAuthModal;
+    private string? error;
+    private List<SavedReportDto>? reports;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Auth.AuthStateChanged += HandleAuthChanged;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        loading = true;
+        error = null;
+        reports = null;
+
+        authed = await Auth.IsAuthenticatedAsync();
+        if (!authed)
+        {
+            loading = false;
+            return;
+        }
+
+        try
+        {
+            var resp = await Http.GetAsync("api/Reports");
+            if (resp.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                await Auth.LogoutAsync();
+                authed = false;
+                return;
+            }
+            resp.EnsureSuccessStatusCode();
+            reports = await resp.Content.ReadFromJsonAsync<List<SavedReportDto>>();
+        }
+        catch (Exception ex)
+        {
+            error = $"Failed to load reports: {ex.Message}";
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private async Task OnAuthenticatedAsync()
+    {
+        showAuthModal = false;
+        await LoadAsync();
+    }
+
+    private async void HandleAuthChanged()
+    {
+        await InvokeAsync(LoadAsync);
+        await InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        Auth.AuthStateChanged -= HandleAuthChanged;
+    }
+}

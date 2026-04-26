@@ -1,0 +1,41 @@
+# .NET build artifacts
+bin/
+obj/
+out/
+publish/
+*.user
+*.suo
+
+# Visual Studio
+.vs/
+*.swp
+*.userprefs
+.idea/
+
+# Rider / VS Code (keep .vscode? — currently no .vscode dir, leave out)
+*.DotSettings.user
+
+# Logs
+*.log
+
+# SQLite database files (server creates demo.db at runtime via auto-migrate)
+*.db
+*.db-shm
+*.db-wal
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Local environment overrides — never check in
+appsettings.Local.json
+**/appsettings.Local.json
+.env
+.env.local
+
+# Render / build scratch
+dotnet/
+dotnet-install.sh
+
+# Claude Code per-machine state
+.claude/settings.local.json

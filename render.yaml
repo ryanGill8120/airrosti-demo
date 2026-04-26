@@ -1,0 +1,55 @@
+# Render Blueprint — describes both services for the AirrostiDemo deployment.
+# Push to master triggers an auto-deploy of any service whose tracked files changed.
+# Docs: https://render.com/docs/blueprint-spec
+
+services:
+  # --- ASP.NET Core Web API ---------------------------------------------------
+  - type: web
+    name: airrosti-server
+    runtime: docker
+    plan: starter            # $7/mo, no cold starts. Use 'free' for cold-start tier.
+    region: oregon
+    branch: master
+    autoDeploy: true
+    rootDir: .
+    dockerContext: .
+    dockerfilePath: ./AirrostiDemo.Server/Dockerfile
+    healthCheckPath: /api/DrugSideEffects/ibuprofen?limit=1
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: Jwt__Key
+        generateValue: true   # Render generates a strong secret on first sync
+      - key: Jwt__Issuer
+        value: AirrostiDemo
+      - key: Jwt__Audience
+        value: AirrostiDemo.Client
+      - key: Jwt__ExpiresMinutes
+        value: "60"
+      - key: ConnectionStrings__DefaultConnection
+        value: Data Source=demo.db
+      - key: Cors__AllowedOrigins
+        value: https://airrosti-client.onrender.com
+
+  # --- Blazor WebAssembly static site ----------------------------------------
+  - type: web
+    name: airrosti-client
+    runtime: static
+    branch: master
+    autoDeploy: true
+    rootDir: .
+    buildCommand: |
+      curl -sSL https://dot.net/v1/dotnet-install.sh -o dotnet-install.sh
+      chmod +x dotnet-install.sh
+      ./dotnet-install.sh --channel 8.0 --install-dir ./dotnet
+      ./dotnet/dotnet publish AirrostiDemo/AirrostiDemo.csproj -c Release -o publish
+    staticPublishPath: ./publish/wwwroot
+    # Blazor WASM is a SPA — every route serves index.html so the router can take over.
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    headers:
+      - path: /_framework/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable

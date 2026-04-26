@@ -1,0 +1,17 @@
+**/bin
+**/obj
+**/out
+**/publish
+**/.vs
+**/.idea
+**/.vscode
+**/*.user
+**/*.db
+**/*.db-shm
+**/*.db-wal
+.git
+.gitignore
+docs/
+README.md
+CLAUDE.md
+.claude/
