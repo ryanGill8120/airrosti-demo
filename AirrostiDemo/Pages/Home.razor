@@ -2,18 +2,77 @@
 
 <PageTitle>AirrostiDemo</PageTitle>
 
-<section class="home-hero" style="margin-top: 2rem">
+<section class="home-hero">
     <div class="home-hero-inner">
         <h1>Adverse Event Insights for Pain Medications</h1>
         <p class="lead">
             Live FDA data, saved per-user, built on .NET 8 + Blazor.
         </p>
-        <a class="btn btn-accent btn-lg" href="drugs">Try the Demo</a>
+        <a class="btn btn-accent btn-lg home-cta" href="drugs">Try the Demo</a>
     </div>
+    <svg class="home-hero-divider" viewBox="0 0 1440 60" preserveAspectRatio="none" aria-hidden="true">
+        <path d="M0,0 C480,60 960,60 1440,0 L1440,60 L0,60 Z" fill="#fff" />
+    </svg>
+</section>
+
+<section class="home-features">
+    <button type="button"
+            class="feature @(activeFeature == 0 ? "feature-active" : "")"
+            aria-expanded="@(activeFeature == 0 ? "true" : "false")"
+            @onclick="() => Toggle(0)">
+        <div class="feature-icon" aria-hidden="true">📊</div>
+        <h3>Live FDA Data</h3>
+        <p>Adverse-event counts streamed straight from openFDA.</p>
+        <div class="feature-popover" role="tooltip">
+            Server-side proxy to <code>api.fda.gov/drug/event.json</code>. The Web API
+            uses a typed <code>HttpClient</code>, clamps query params, translates
+            <code>429</code>/<code>5xx</code> from FDA into <code>503</code> with a
+            retry-after, and supports an optional <code>OpenFda:ApiKey</code> to lift
+            the per-IP quota from 1k to 120k requests/day. The WASM client never
+            calls FDA directly.
+        </div>
+    </button>
+
+    <button type="button"
+            class="feature @(activeFeature == 1 ? "feature-active" : "")"
+            aria-expanded="@(activeFeature == 1 ? "true" : "false")"
+            @onclick="() => Toggle(1)">
+        <div class="feature-icon" aria-hidden="true">🔒</div>
+        <h3>User Accounts</h3>
+        <p>JWT-secured saves with per-user report history.</p>
+        <div class="feature-popover" role="tooltip">
+            ASP.NET Core Identity issues bearer tokens via a custom
+            <code>JwtTokenService</code>. The Blazor client stores the token in
+            <code>localStorage</code>, and a <code>DelegatingHandler</code> attaches
+            <code>Authorization: Bearer</code> on every outbound request. Saved reports
+            are scoped to the caller's <code>NameIdentifier</code> claim — the API
+            never trusts a user id sent from the client.
+        </div>
+    </button>
+
+    <button type="button"
+            class="feature @(activeFeature == 2 ? "feature-active" : "")"
+            aria-expanded="@(activeFeature == 2 ? "true" : "false")"
+            @onclick="() => Toggle(2)">
+        <div class="feature-icon" aria-hidden="true">⚙️</div>
+        <h3>.NET 8 + Blazor</h3>
+        <p>Razor on the client, ASP.NET Core API on Render.</p>
+        <div class="feature-popover" role="tooltip">
+            Three-project .NET 8 solution: a standalone Blazor WebAssembly client,
+            an ASP.NET Core Web API, and a shared DTO library. EF Core 8 + SQLite
+            persist users and reports with auto-migration on boot. The server ships
+            as a multi-stage Docker image; both services deploy from
+            <code>master</code> on Render via a single Blueprint
+            (<code>render.yaml</code>).
+        </div>
+    </button>
 </section>
 
 <section class="home-about">
     <h2>About Me</h2>
+    <img src="images/RyanHeadshot.png" alt="Ryan Gill headshot"
+         class="about-headshot" loading="lazy" decoding="async"
+         width="260" height="260" />
     <p>
         Hello! My name is Ryan Gill, and I'm a Software Engineer. This site is a
         small full-stack demo built to showcase a working .NET + Blazor stack
@@ -33,3 +92,12 @@
         sharpen and showcase those skills &mdash; expect the copy here to evolve.
     </p>
 </section>
+
+@code {
+    private int? activeFeature;
+
+    private void Toggle(int index)
+    {
+        activeFeature = activeFeature == index ? null : index;
+    }
+}
