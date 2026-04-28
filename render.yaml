@@ -14,7 +14,7 @@ services:
     rootDir: .
     dockerContext: .
     dockerfilePath: ./AirrostiDemo.Server/Dockerfile
-    healthCheckPath: /api/DrugSideEffects/ibuprofen?limit=1
+    healthCheckPath: /api/Health
     envVars:
       - key: ASPNETCORE_ENVIRONMENT
         value: Production
@@ -30,6 +30,8 @@ services:
         value: Data Source=demo.db
       - key: Cors__AllowedOrigins
         value: https://airrosti-client.onrender.com
+      - key: OpenFda__ApiKey
+        sync: false   # Set in Render dashboard. Optional — lifts FDA quota from 1k/day to 120k/day.
 
   # --- Blazor WebAssembly static site ----------------------------------------
   - type: web

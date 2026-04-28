@@ -34,7 +34,10 @@ DTOs flow client → server through `AirrostiDemo.Shared`. New API contracts bel
 - Named `HttpClient` `"openFDA"` (constant `OpenFdaClient.HttpClientName`) is registered in `AirrostiDemo.Server/Program.cs` with `BaseAddress = https://api.fda.gov/`.
 - `AirrostiDemo.Server/Services/OpenFdaClient.cs` wraps that client and is the only place that should call FDA. Controllers inject `OpenFdaClient`, not `IHttpClientFactory` directly.
 - OpenFDA returns `404` when a drug has no matching events — `OpenFdaClient` translates that into an empty `FdaCountResponse` rather than throwing.
+- OpenFDA `429` / `5xx` are translated into `OpenFdaUnavailableException`; `DrugSideEffectsController` catches and returns `503` with `{ message, retryAfterSeconds }` so the client never sees a 500.
+- Optional `OpenFda:ApiKey` config (env var `OpenFda__ApiKey` on Render). When set, it's appended as `api_key=…` to outbound requests, lifting the per-IP quota from 1,000/day to 120,000/day. Free key from https://open.fda.gov/apis/authentication/.
 - The proxied endpoint is `GET /api/DrugSideEffects/{drugName}?limit=10` (limit clamped 1–50). Do not call OpenFDA from the WASM client.
+- Render's health check hits `/api/Health` (not the FDA proxy) so health pings don't burn the OpenFDA quota.
 
 ## Authentication & storage
 - **ASP.NET Core Identity + JWT bearer tokens.** No cookies, no external IdP. Server uses `AddIdentityCore<AppUser>` (no roles, no SignInManager cookie surface).

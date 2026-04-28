@@ -9,10 +9,14 @@ namespace AirrostiDemo.Server.Controllers
     public class DrugSideEffectsController : ControllerBase
     {
         private readonly OpenFdaClient _openFda;
+        private readonly ILogger<DrugSideEffectsController> _logger;
 
-        public DrugSideEffectsController(OpenFdaClient openFda)
+        public DrugSideEffectsController(
+            OpenFdaClient openFda,
+            ILogger<DrugSideEffectsController> logger)
         {
             _openFda = openFda;
+            _logger = logger;
         }
 
         [HttpGet("{drugName}")]
@@ -28,8 +32,22 @@ namespace AirrostiDemo.Server.Controllers
 
             limit = Math.Clamp(limit, 1, 50);
 
-            var result = await _openFda.GetReactionCountsAsync(drugName, limit, ct);
-            return Ok(result);
+            try
+            {
+                var result = await _openFda.GetReactionCountsAsync(drugName, limit, ct);
+                return Ok(result);
+            }
+            catch (OpenFdaUnavailableException ex)
+            {
+                _logger.LogWarning(
+                    "OpenFDA unavailable ({Status}) for drug={Drug}",
+                    (int)ex.StatusCode, drugName);
+                return StatusCode(503, new
+                {
+                    message = "OpenFDA is temporarily unavailable, please try again shortly.",
+                    retryAfterSeconds = ex.RetryAfterSeconds,
+                });
+            }
         }
     }
 }
