@@ -97,6 +97,7 @@ else if (response is not null)
 }
 
 <AuthModal Show="@showAuthModal"
+           StartMode="AuthModalMode.Register"
            OnClose="() => showAuthModal = false"
            OnAuthenticated="OnAuthenticatedAsync" />
 

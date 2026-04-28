@@ -1,60 +1,77 @@
+@using AirrostiDemo.Components
 @using AirrostiDemo.Services
 @inject AuthService Auth
 @implements IDisposable
 
-<div class="top-row ps-3 navbar navbar-dark">
-    <div class="container-fluid">
-        <a class="navbar-brand" href="">AirrostiDemo</a>
-        <button title="Navigation menu" class="navbar-toggler" @onclick="ToggleNavMenu">
-            <span class="navbar-toggler-icon"></span>
+<header class="app-navbar">
+    <div class="app-navbar-inner">
+        <button type="button" class="hamburger" aria-label="Open menu"
+                @onclick="OpenDrawer">
+            <span></span><span></span><span></span>
         </button>
-    </div>
-</div>
 
-<div class="@NavMenuCssClass nav-scrollable" @onclick="ToggleNavMenu">
-    <nav class="flex-column">
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Home
-            </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="counter">
-                <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span> Counter
-            </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="weather">
-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Weather
-            </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="drugs">
-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Drug Search
-            </NavLink>
-        </div>
-        @if (authed)
-        {
-            <div class="nav-item px-3">
-                <NavLink class="nav-link" href="my-reports">
-                    <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> My Reports
-                </NavLink>
-            </div>
-            <div class="nav-item px-3">
-                <button type="button" class="nav-link btn btn-link text-start"
-                        @onclick="LogoutAsync">
-                    <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Log out
+        <a class="brand" href="">AirrostiDemo</a>
+
+        <nav class="nav-links">
+            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">Home</NavLink>
+            <NavLink class="nav-link" href="drugs">Demo</NavLink>
+            @if (authed)
+            {
+                <NavLink class="nav-link" href="my-reports">Reports</NavLink>
+            }
+        </nav>
+
+        <div class="account-area">
+            @if (authed)
+            {
+                <div class="account-box">
+                    <span class="account-email" title="@Auth.CurrentEmail">@Auth.CurrentEmail</span>
+                    <button type="button" class="btn btn-sm btn-outline-light"
+                            @onclick="LogoutAsync">
+                        Sign out
+                    </button>
+                </div>
+            }
+            else
+            {
+                <button type="button" class="btn btn-sm btn-accent"
+                        @onclick="OpenSignIn">
+                    Sign in
                 </button>
-            </div>
-        }
-    </nav>
-</div>
+            }
+        </div>
+    </div>
+</header>
+
+@if (drawerOpen)
+{
+    <div class="drawer-backdrop" @onclick="CloseDrawer"></div>
+    <aside class="mobile-drawer">
+        <div class="drawer-header">
+            <span class="brand">AirrostiDemo</span>
+            <button type="button" class="btn-close-x" aria-label="Close menu"
+                    @onclick="CloseDrawer">×</button>
+        </div>
+        <nav class="drawer-nav" @onclick="CloseDrawer">
+            <NavLink class="drawer-link" href="" Match="NavLinkMatch.All">Home</NavLink>
+            <NavLink class="drawer-link" href="drugs">Demo</NavLink>
+            @if (authed)
+            {
+                <NavLink class="drawer-link" href="my-reports">Reports</NavLink>
+            }
+        </nav>
+    </aside>
+}
+
+<AuthModal Show="@showAuthModal"
+           StartMode="AuthModalMode.Login"
+           OnClose="() => showAuthModal = false"
+           OnAuthenticated="OnAuthenticatedAsync" />
 
 @code {
-    private bool collapseNavMenu = true;
     private bool authed;
-
-    private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
+    private bool drawerOpen;
+    private bool showAuthModal;
 
     protected override async Task OnInitializedAsync()
     {
@@ -62,13 +79,24 @@
         authed = await Auth.IsAuthenticatedAsync();
     }
 
-    private void ToggleNavMenu()
+    private void OpenDrawer() => drawerOpen = true;
+    private void CloseDrawer() => drawerOpen = false;
+
+    private void OpenSignIn()
     {
-        collapseNavMenu = !collapseNavMenu;
+        drawerOpen = false;
+        showAuthModal = true;
+    }
+
+    private Task OnAuthenticatedAsync()
+    {
+        showAuthModal = false;
+        return Task.CompletedTask;
     }
 
     private async Task LogoutAsync()
     {
+        drawerOpen = false;
         await Auth.LogoutAsync();
     }
 

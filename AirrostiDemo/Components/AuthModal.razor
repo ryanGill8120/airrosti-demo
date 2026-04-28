@@ -12,16 +12,16 @@
                     <ul class="nav nav-tabs card-header-tabs">
                         <li class="nav-item">
                             <button type="button"
-                                    class="nav-link @(mode == Mode.Login ? "active" : "")"
-                                    @onclick="() => SetMode(Mode.Login)">
-                                Log in
+                                    class="nav-link @(mode == AuthModalMode.Register ? "active" : "")"
+                                    @onclick="() => SetMode(AuthModalMode.Register)">
+                                Register
                             </button>
                         </li>
                         <li class="nav-item">
                             <button type="button"
-                                    class="nav-link @(mode == Mode.Register ? "active" : "")"
-                                    @onclick="() => SetMode(Mode.Register)">
-                                Register
+                                    class="nav-link @(mode == AuthModalMode.Login ? "active" : "")"
+                                    @onclick="() => SetMode(AuthModalMode.Login)">
+                                Log in
                             </button>
                         </li>
                     </ul>
@@ -37,8 +37,8 @@
                         <label class="form-label" for="auth-password">Password</label>
                         <input id="auth-password" type="password" class="form-control"
                                @bind="password" @bind:event="oninput"
-                               autocomplete="@(mode == Mode.Login ? "current-password" : "new-password")" />
-                        @if (mode == Mode.Register)
+                               autocomplete="@(mode == AuthModalMode.Login ? "current-password" : "new-password")" />
+                        @if (mode == AuthModalMode.Register)
                         {
                             <div class="form-text">Minimum 6 characters.</div>
                         }
@@ -56,7 +56,7 @@
                     <button type="button" class="btn btn-primary"
                             @onclick="SubmitAsync"
                             disabled="@(busy || string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))">
-                        @(mode == Mode.Login ? "Log in" : "Register")
+                        @(mode == AuthModalMode.Login ? "Log in" : "Register")
                     </button>
                 </div>
             </div>
@@ -65,19 +65,29 @@
 }
 
 @code {
-    private enum Mode { Login, Register }
-
     [Parameter] public bool Show { get; set; }
     [Parameter] public EventCallback OnClose { get; set; }
     [Parameter] public EventCallback OnAuthenticated { get; set; }
+    [Parameter] public AuthModalMode StartMode { get; set; } = AuthModalMode.Register;
 
-    private Mode mode = Mode.Login;
+    private AuthModalMode mode = AuthModalMode.Register;
+    private bool wasShown;
     private string email = string.Empty;
     private string password = string.Empty;
     private string? error;
     private bool busy;
 
-    private void SetMode(Mode m)
+    protected override void OnParametersSet()
+    {
+        if (Show && !wasShown)
+        {
+            mode = StartMode;
+            error = null;
+        }
+        wasShown = Show;
+    }
+
+    private void SetMode(AuthModalMode m)
     {
         mode = m;
         error = null;
@@ -89,7 +99,7 @@
         error = null;
         try
         {
-            if (mode == Mode.Register)
+            if (mode == AuthModalMode.Register)
             {
                 var (regOk, regErr) = await Auth.RegisterAsync(new RegisterDto
                 {
@@ -128,7 +138,7 @@
         email = string.Empty;
         password = string.Empty;
         error = null;
-        mode = Mode.Login;
+        mode = StartMode;
         await OnClose.InvokeAsync();
     }
 }

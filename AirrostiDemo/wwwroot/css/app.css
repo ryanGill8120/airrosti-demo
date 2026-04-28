@@ -1,5 +1,15 @@
+:root {
+    --brand-primary: #003366;
+    --brand-accent: #FE9933;
+    --brand-hover: #89B0D5;
+    --brand-ink: #1a1a1a;
+    --brand-muted: #6c757d;
+}
+
 html, body {
     font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    color: var(--brand-ink);
+    background-color: #fff;
 }
 
 h1:focus {
@@ -7,17 +17,54 @@ h1:focus {
 }
 
 a, .btn-link {
-    color: #0071c1;
+    color: var(--brand-primary);
+}
+
+a:hover, .btn-link:hover {
+    color: var(--brand-hover);
 }
 
 .btn-primary {
     color: #fff;
-    background-color: #1b6ec2;
-    border-color: #1861ac;
+    background-color: var(--brand-primary);
+    border-color: var(--brand-primary);
+}
+
+.btn-primary:hover, .btn-primary:focus, .btn-primary:active {
+    color: #fff;
+    background-color: var(--brand-hover);
+    border-color: var(--brand-hover);
+}
+
+.btn-accent {
+    color: #fff;
+    background-color: var(--brand-accent);
+    border-color: var(--brand-accent);
+}
+
+.btn-accent:hover, .btn-accent:focus, .btn-accent:active {
+    color: #fff;
+    background-color: var(--brand-hover);
+    border-color: var(--brand-hover);
+}
+
+.btn-outline-primary {
+    color: var(--brand-primary);
+    border-color: var(--brand-primary);
+}
+
+.btn-outline-primary:hover, .btn-outline-primary:focus, .btn-outline-primary:active {
+    color: #fff;
+    background-color: var(--brand-primary);
+    border-color: var(--brand-primary);
+}
+
+.progress-bar {
+    background-color: var(--brand-primary);
 }
 
 .btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
-  box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
+    box-shadow: 0 0 0 0.1rem #fff, 0 0 0 0.25rem var(--brand-hover);
 }
 
 .content {
@@ -82,7 +129,7 @@ a, .btn-link {
     }
 
         .loading-progress circle:last-child {
-            stroke: #1b6ec2;
+            stroke: var(--brand-primary);
             stroke-dasharray: calc(3.141 * var(--blazor-load-percentage, 0%) * 0.8), 500%;
             transition: stroke-dasharray 0.05s ease-in-out;
         }

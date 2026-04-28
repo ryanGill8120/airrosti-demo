@@ -57,6 +57,7 @@ else
 }
 
 <AuthModal Show="@showAuthModal"
+           StartMode="AuthModalMode.Register"
            OnClose="() => showAuthModal = false"
            OnAuthenticated="OnAuthenticatedAsync" />
 
