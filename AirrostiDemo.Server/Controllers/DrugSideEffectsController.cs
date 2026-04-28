@@ -37,6 +37,10 @@ namespace AirrostiDemo.Server.Controllers
                 var result = await _openFda.GetReactionCountsAsync(drugName, limit, ct);
                 return Ok(result);
             }
+            catch (DrugNotFoundException)
+            {
+                return NotFound(new { message = "Drug not found." });
+            }
             catch (OpenFdaUnavailableException ex)
             {
                 _logger.LogWarning(
@@ -46,6 +50,18 @@ namespace AirrostiDemo.Server.Controllers
                 {
                     message = "OpenFDA is temporarily unavailable, please try again shortly.",
                     retryAfterSeconds = ex.RetryAfterSeconds,
+                });
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Unexpected error fetching reactions for drug={Drug}", drugName);
+                return StatusCode(503, new
+                {
+                    message = "Something went wrong fetching that drug, please try again.",
                 });
             }
         }

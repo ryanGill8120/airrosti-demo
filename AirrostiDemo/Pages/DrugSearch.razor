@@ -1,4 +1,5 @@
 @page "/drugs"
+@using System.Net
 @using AirrostiDemo.Shared.OpenFda
 @inject HttpClient Http
 @inject AuthService Auth
@@ -133,12 +134,30 @@ else if (response is not null)
 
         try
         {
-            response = await Http.GetFromJsonAsync<FdaCountResponse>(
+            var resp = await Http.GetAsync(
                 $"api/DrugSideEffects/{Uri.EscapeDataString(drug)}");
+
+            if (resp.StatusCode == HttpStatusCode.NotFound)
+            {
+                error = "Drug not found.";
+                return;
+            }
+            if (resp.StatusCode == HttpStatusCode.ServiceUnavailable)
+            {
+                error = "FDA data is temporarily unavailable, please try again shortly.";
+                return;
+            }
+            if (!resp.IsSuccessStatusCode)
+            {
+                error = "Could not fetch data, please try again.";
+                return;
+            }
+
+            response = await resp.Content.ReadFromJsonAsync<FdaCountResponse>();
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            error = $"Failed to fetch data: {ex.Message}";
+            error = "Could not fetch data, please try again.";
         }
         finally
         {

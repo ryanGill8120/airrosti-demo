@@ -45,10 +45,13 @@ namespace AirrostiDemo.Server.Services
 
             using var response = await http.GetAsync(url, ct);
 
-            // OpenFDA returns 404 when a drug has no matching events — treat as empty.
-            if (response.StatusCode == HttpStatusCode.NotFound)
+            // OpenFDA returns 404 when no events match. 400 means the drug name
+            // produced an unparseable query (e.g. random punctuation). For the
+            // user, both mean "we couldn't find that drug."
+            if (response.StatusCode == HttpStatusCode.NotFound
+                || response.StatusCode == HttpStatusCode.BadRequest)
             {
-                return new FdaCountResponse { DrugName = drugName };
+                throw new DrugNotFoundException(drugName);
             }
 
             if (response.StatusCode == HttpStatusCode.TooManyRequests
@@ -95,6 +98,17 @@ namespace AirrostiDemo.Server.Services
         {
             StatusCode = statusCode;
             RetryAfterSeconds = retryAfterSeconds;
+        }
+    }
+
+    public class DrugNotFoundException : Exception
+    {
+        public string DrugName { get; }
+
+        public DrugNotFoundException(string drugName)
+            : base($"OpenFDA has no events matching '{drugName}'.")
+        {
+            DrugName = drugName;
         }
     }
 }
