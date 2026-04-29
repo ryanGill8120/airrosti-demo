@@ -1,3 +1,10 @@
+@* ----------------------------------------------------------------------
+   MyReports.razor — authenticated page at "/my-reports".
+
+   Lists every saved FDA snapshot belonging to the calling user, newest
+   first. Listens to AuthService.AuthStateChanged so the list refreshes
+   automatically on sign-in / sign-out without a page reload.
+   ---------------------------------------------------------------------- *@
 @page "/my-reports"
 @using AirrostiDemo.Components
 @using AirrostiDemo.Services
@@ -8,8 +15,16 @@
 
 <PageTitle>My Reports</PageTitle>
 
-<h1>My Reports</h1>
+<section class="reports-hero">
+    <div class="reports-hero-inner">
+        <h1>My Saved Reports</h1>
+        <p class="lead">Snapshots of FDA adverse-event data you've saved.</p>
+    </div>
+</section>
 
+@* Render-state cascade: we walk through "loading", "not signed in",
+   "errored", "empty", and finally "show the list" in order, so each
+   case has a single owning branch. *@
 @if (loading)
 {
     <p><em>Loading...</em></p>
@@ -30,30 +45,41 @@ else if (reports is null || reports.Count == 0)
 }
 else
 {
-    @foreach (var r in reports)
-    {
-        <div class="card mb-3">
-            <div class="card-body">
-                <h5 class="card-title">
-                    @r.DrugName
-                    <small class="text-muted">— saved @r.SavedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</small>
-                </h5>
-                @if (r.Report.Results.Count == 0)
-                {
-                    <p class="card-text text-muted">No reactions recorded.</p>
-                }
-                else
-                {
-                    <ol class="mb-0">
-                        @foreach (var reaction in r.Report.Results.Take(3))
-                        {
-                            <li>@reaction.Term — @reaction.Count.ToString("N0") reports</li>
-                        }
-                    </ol>
-                }
+    <div class="report-list">
+        @foreach (var r in reports)
+        {
+            <div class="report-card">
+                <div class="report-card-body">
+                    @* SavedAt is UTC on the wire (the server attaches
+                       DateTimeKind.Utc); ToLocalTime() shifts it for display. *@
+                    <h5 class="report-card-title">@r.DrugName</h5>
+                    <div class="report-card-meta">
+                        Saved @r.SavedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")
+                    </div>
+                    @if (r.Report.Results.Count == 0)
+                    {
+                        <p class="report-card-empty">No reactions recorded.</p>
+                    }
+                    else
+                    {
+                        @* Show only the top 3 reactions per card; the full
+                           list is preserved server-side and could be exposed
+                           through a future "details" view. *@
+                        <div class="report-card-subtitle">Top 3 reactions by report count</div>
+                        <ol class="report-reactions">
+                            @foreach (var reaction in r.Report.Results.Take(3))
+                            {
+                                <li>
+                                    <span class="reaction-term">@reaction.Term</span>
+                                    <span class="reaction-count">@reaction.Count.ToString("N0") reports</span>
+                                </li>
+                            }
+                        </ol>
+                    }
+                </div>
             </div>
-        </div>
-    }
+        }
+    </div>
 }
 
 <AuthModal Show="@showAuthModal"
@@ -68,12 +94,23 @@ else
     private string? error;
     private List<SavedReportDto>? reports;
 
+    /// <summary>
+    /// Subscribe to auth-state changes and trigger the initial load.
+    /// We hook the event here rather than in the constructor for the
+    /// same reason as NavMenu — JS interop isn't available pre-mount.
+    /// </summary>
     protected override async Task OnInitializedAsync()
     {
         Auth.AuthStateChanged += HandleAuthChanged;
         await LoadAsync();
     }
 
+    /// <summary>
+    /// Fetch the caller's saved reports. Bails out early if the user
+    /// isn't signed in (the UI prompts them to log in instead). On a
+    /// 401 we transparently log out — the only way to get a 401 here
+    /// is an expired token, and forcing a logout keeps the UI in sync.
+    /// </summary>
     private async Task LoadAsync()
     {
         loading = true;
@@ -90,6 +127,9 @@ else
         try
         {
             var resp = await Http.GetAsync("api/Reports");
+            // 401: token expired between the IsAuthenticatedAsync check
+            // and this request. Clear the session and re-render — the
+            // "not signed in" branch will pick it up.
             if (resp.StatusCode == System.Net.HttpStatusCode.Unauthorized)
             {
                 await Auth.LogoutAsync();
@@ -109,18 +149,33 @@ else
         }
     }
 
+    /// <summary>
+    /// Modal-success callback: close the modal and re-run the load,
+    /// which now succeeds because the user is freshly authenticated.
+    /// </summary>
     private async Task OnAuthenticatedAsync()
     {
         showAuthModal = false;
         await LoadAsync();
     }
 
+    /// <summary>
+    /// Cross-component auth-state listener: any sign-in / sign-out
+    /// anywhere in the app (e.g. via the nav bar) refreshes this page.
+    /// InvokeAsync marshals back to the renderer thread, which is
+    /// required when reacting to events that may fire off-renderer.
+    /// </summary>
     private async void HandleAuthChanged()
     {
         await InvokeAsync(LoadAsync);
         await InvokeAsync(StateHasChanged);
     }
 
+    /// <summary>
+    /// Detach the event handler when the page navigates away — without
+    /// this, NavMenu and this page would both keep references to each
+    /// other and leak on every navigation cycle.
+    /// </summary>
     public void Dispose()
     {
         Auth.AuthStateChanged -= HandleAuthChanged;

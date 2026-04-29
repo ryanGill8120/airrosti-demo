@@ -1,7 +1,16 @@
+@* ----------------------------------------------------------------------
+   Home.razor — landing page at "/".
+
+   Pure presentation: hero, three "feature" cards with click-to-expand
+   pop-overs explaining the technical implementation, and a brief about
+   section. No data fetching, no auth.
+   ---------------------------------------------------------------------- *@
 @page "/"
 
 <PageTitle>AirrostiDemo</PageTitle>
 
+@* Hero section with the headline, subhead, and primary CTA pointing at
+   the actual demo page. *@
 <section class="home-hero">
     <div class="home-hero-inner">
         <h1>Adverse Event Insights for Pain Medications</h1>
@@ -10,11 +19,17 @@
         </p>
         <a class="btn btn-accent btn-lg home-cta" href="drugs">Try the Demo</a>
     </div>
+    @* SVG curve at the bottom of the hero so it blends into the white
+       feature section below. preserveAspectRatio="none" is what stretches
+       it across any viewport width without distortion clipping. *@
     <svg class="home-hero-divider" viewBox="0 0 1440 60" preserveAspectRatio="none" aria-hidden="true">
         <path d="M0,0 C480,60 960,60 1440,0 L1440,60 L0,60 Z" fill="#fff" />
     </svg>
 </section>
 
+@* Three feature buttons. Each one is itself the click-target — tapping
+   toggles the popover via Toggle(index). aria-expanded keeps the state
+   exposed to assistive tech. *@
 <section class="home-features">
     <button type="button"
             class="feature @(activeFeature == 0 ? "feature-active" : "")"
@@ -68,6 +83,8 @@
     </button>
 </section>
 
+@* About section. lazy + decoding=async on the headshot so it never
+   blocks first paint of the hero. *@
 <section class="home-about">
     <h2>About Me</h2>
     <img src="images/RyanHeadshot.png" alt="Ryan Gill headshot"
@@ -82,20 +99,29 @@
     <p>
         I came to software from a non-traditional path: I taught myself Python in
         2017 while managing in retail, then formally pursued a Computer Science
-        degree at UTSA in 2019. Along the way I worked as a CS Teaching Assistant
-        and interned at Continental, a Fortune-500 manufacturer, where I got my
-        first taste of professional software development.
+        degree at UTSA in 2019. I spent time as an intern and junior engineer
+        and interned at Continental, a Fortune-500 manufacturer, then moved on to become
+        a Full-Stack Developer at Alterman.
     </p>
     <p>
-        Since graduating I've been a full-time Software Engineer focused on
-        backend and full-stack work. This demo is one of several I'm using to
-        sharpen and showcase those skills &mdash; expect the copy here to evolve.
+        In my spare time I enjoy spending time with my family, cooking and playing Tennis. 
+        I'm passionate about my work and love seeing how technology can shape business strategy
+        and vice versa. I hope this page gives you a brief but informative showcase of my skills.
     </p>
 </section>
 
 @code {
+    /// <summary>
+    /// Index of the currently-expanded feature popover, or null if all
+    /// are collapsed. Using a single int (rather than a bool per card)
+    /// makes "only one open at a time" automatic.
+    /// </summary>
     private int? activeFeature;
 
+    /// <summary>
+    /// Toggle behaviour: clicking the active card collapses it, clicking
+    /// any other card switches the open one over.
+    /// </summary>
     private void Toggle(int index)
     {
         activeFeature = activeFeature == index ? null : index;

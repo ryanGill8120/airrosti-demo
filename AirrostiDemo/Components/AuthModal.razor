@@ -1,14 +1,26 @@
+@* ----------------------------------------------------------------------
+   AuthModal.razor — shared register / login dialog.
+
+   Reused from multiple call sites; each one passes a StartMode so the
+   dialog opens on the relevant tab. On success the modal calls
+   OnAuthenticated and then closes itself via OnClose.
+   ---------------------------------------------------------------------- *@
 @using AirrostiDemo.Services
 @using AirrostiDemo.Shared.Auth
 @inject AuthService Auth
 
 @if (Show)
 {
+    @* Bootstrap modal markup. We control visibility ourselves rather
+       than going through Bootstrap's JS, which keeps this component
+       framework-free and easier to test. *@
     <div class="modal show d-block" tabindex="-1" role="dialog"
          style="background: rgba(0, 0, 0, 0.5);">
         <div class="modal-dialog" role="document">
             <div class="modal-content">
                 <div class="modal-header">
+                    @* Tab strip for swapping between Register and Login.
+                       The active class follows the `mode` field. *@
                     <ul class="nav nav-tabs card-header-tabs">
                         <li class="nav-item">
                             <button type="button"
@@ -30,11 +42,17 @@
                 <div class="modal-body">
                     <div class="mb-3">
                         <label class="form-label" for="auth-email">Email</label>
+                        @* @bind:event="oninput" makes the field two-way
+                           bound on every keystroke — without it, the
+                           submit button's disabled state would lag a tab. *@
                         <input id="auth-email" type="email" class="form-control"
                                @bind="email" @bind:event="oninput" autocomplete="email" />
                     </div>
                     <div class="mb-3">
                         <label class="form-label" for="auth-password">Password</label>
+                        @* The autocomplete attribute switches between
+                           current-password / new-password so password
+                           managers offer the right thing per mode. *@
                         <input id="auth-password" type="password" class="form-control"
                                @bind="password" @bind:event="oninput"
                                autocomplete="@(mode == AuthModalMode.Login ? "current-password" : "new-password")" />
@@ -53,6 +71,9 @@
                             @onclick="HandleCloseAsync" disabled="@busy">
                         Cancel
                     </button>
+                    @* Submit is disabled while the request is in flight
+                       and while either input is empty — cheap client-side
+                       guard against double-submits. *@
                     <button type="button" class="btn btn-primary"
                             @onclick="SubmitAsync"
                             disabled="@(busy || string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))">
@@ -65,9 +86,21 @@
 }
 
 @code {
+    /// <summary>Whether the modal should be visible right now.</summary>
     [Parameter] public bool Show { get; set; }
+
+    /// <summary>Fired when the user dismisses the modal (X / Cancel /
+    /// post-success). Parent owns the Show flag.</summary>
     [Parameter] public EventCallback OnClose { get; set; }
+
+    /// <summary>Fired after a successful login. The parent typically uses
+    /// this to retry whatever action triggered the modal — saving a
+    /// report, re-fetching a list, etc.</summary>
     [Parameter] public EventCallback OnAuthenticated { get; set; }
+
+    /// <summary>Which tab the modal opens on. Defaults to Register because
+    /// the most common entry point is "save my results — but I haven't
+    /// signed up yet".</summary>
     [Parameter] public AuthModalMode StartMode { get; set; } = AuthModalMode.Register;
 
     private AuthModalMode mode = AuthModalMode.Register;
@@ -77,6 +110,12 @@
     private string? error;
     private bool busy;
 
+    /// <summary>
+    /// Reset the modal to its starting tab and clear any stale error
+    /// every time it transitions from hidden to shown. Tracking the
+    /// previous Show value via wasShown means we don't clobber the
+    /// user's chosen tab on subsequent re-renders.
+    /// </summary>
     protected override void OnParametersSet()
     {
         if (Show && !wasShown)
@@ -93,6 +132,13 @@
         error = null;
     }
 
+    /// <summary>
+    /// Submit the form. In Register mode we register first and, on
+    /// success, follow up with a login so the user lands authenticated
+    /// without having to type their credentials twice. The try/finally
+    /// guarantees the busy flag is always cleared, even if an
+    /// exception bubbles up.
+    /// </summary>
     private async Task SubmitAsync()
     {
         busy = true;
@@ -113,6 +159,8 @@
                 }
             }
 
+            // Whether we just registered or were already in Login mode,
+            // exchange the credentials for a token here.
             var (loginOk, loginErr) = await Auth.LoginAsync(new LoginDto
             {
                 Email = email,
@@ -124,6 +172,8 @@
                 return;
             }
 
+            // Notify the parent first (so it can kick off whatever it
+            // was waiting for) and then close ourselves down.
             await OnAuthenticated.InvokeAsync();
             await HandleCloseAsync();
         }
@@ -133,6 +183,11 @@
         }
     }
 
+    /// <summary>
+    /// Reset all the local form state and notify the parent to flip the
+    /// Show flag off. Always clearing here means a re-open won't show
+    /// stale credentials or error text.
+    /// </summary>
     private async Task HandleCloseAsync()
     {
         email = string.Empty;

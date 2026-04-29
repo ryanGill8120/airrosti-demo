@@ -1,3 +1,10 @@
+@* ----------------------------------------------------------------------
+   NavMenu.razor — top navigation bar plus mobile drawer.
+
+   Listens to AuthService.AuthStateChanged so it re-renders the moment
+   the user signs in or out — no page refresh needed. Implements
+   IDisposable so the event subscription is cleaned up on unload.
+   ---------------------------------------------------------------------- *@
 @using AirrostiDemo.Components
 @using AirrostiDemo.Services
 @inject AuthService Auth
@@ -5,6 +12,8 @@
 
 <header class="app-navbar">
     <div class="app-navbar-inner">
+        @* Hamburger only matters on small screens; CSS hides it on
+           desktop. Toggling drawerOpen drives the slide-in below. *@
         <button type="button" class="hamburger" aria-label="Open menu"
                 @onclick="OpenDrawer">
             <span></span><span></span><span></span>
@@ -12,6 +21,8 @@
 
         <a class="brand" href="">AirrostiDemo</a>
 
+        @* Desktop nav. The Reports link is gated on auth state so an
+           anonymous visitor doesn't see a link they'd just bounce off. *@
         <nav class="nav-links">
             <NavLink class="nav-link" href="" Match="NavLinkMatch.All">Home</NavLink>
             <NavLink class="nav-link" href="drugs">Demo</NavLink>
@@ -21,6 +32,8 @@
             }
         </nav>
 
+        @* Right-aligned account area. Swaps between a "Sign in" button
+           and an email + sign-out pair depending on auth. *@
         <div class="account-area">
             @if (authed)
             {
@@ -43,6 +56,8 @@
     </div>
 </header>
 
+@* Mobile slide-out drawer. Backdrop click and any link click both close
+   it (the @onclick on .drawer-nav fires for any descendant click). *@
 @if (drawerOpen)
 {
     <div class="drawer-backdrop" @onclick="CloseDrawer"></div>
@@ -63,6 +78,8 @@
     </aside>
 }
 
+@* Shared modal used for both sign-in and registration. We open it in
+   Login mode by default from the nav-bar entry point. *@
 <AuthModal Show="@showAuthModal"
            StartMode="AuthModalMode.Login"
            OnClose="() => showAuthModal = false"
@@ -73,6 +90,12 @@
     private bool drawerOpen;
     private bool showAuthModal;
 
+    /// <summary>
+    /// Subscribe to auth-state changes and seed the initial value. We do
+    /// this in OnInitializedAsync (not in the constructor) because the
+    /// Auth check has to bounce through JS interop — that's only legal
+    /// once the component is mounted.
+    /// </summary>
     protected override async Task OnInitializedAsync()
     {
         Auth.AuthStateChanged += HandleAuthChanged;
@@ -82,12 +105,21 @@
     private void OpenDrawer() => drawerOpen = true;
     private void CloseDrawer() => drawerOpen = false;
 
+    /// <summary>
+    /// Open the auth modal in Login mode. Closing the drawer first stops
+    /// the modal from sitting underneath the slide-out on mobile.
+    /// </summary>
     private void OpenSignIn()
     {
         drawerOpen = false;
         showAuthModal = true;
     }
 
+    /// <summary>
+    /// Modal-success callback: just close the modal. The actual auth-
+    /// state update is delivered through AuthService.AuthStateChanged
+    /// → HandleAuthChanged, which fires from anywhere in the app.
+    /// </summary>
     private Task OnAuthenticatedAsync()
     {
         showAuthModal = false;
@@ -100,12 +132,22 @@
         await Auth.LogoutAsync();
     }
 
+    /// <summary>
+    /// Re-evaluate auth state and force a re-render. We marshal back to
+    /// the dispatcher with InvokeAsync because the event can fire from
+    /// any thread and StateHasChanged must be called on the renderer.
+    /// </summary>
     private async void HandleAuthChanged()
     {
         authed = await Auth.IsAuthenticatedAsync();
         await InvokeAsync(StateHasChanged);
     }
 
+    /// <summary>
+    /// Detach the event handler when the component is torn down. Without
+    /// this, navigations that recreate NavMenu would leak handlers and
+    /// each Login click would trigger N rerenders.
+    /// </summary>
     public void Dispose()
     {
         Auth.AuthStateChanged -= HandleAuthChanged;

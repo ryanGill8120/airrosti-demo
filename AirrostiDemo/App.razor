@@ -1,8 +1,21 @@
-﻿<Router AppAssembly="@typeof(App).Assembly">
+@* ----------------------------------------------------------------------
+   App.razor — root component mounted into <div id="app"> by Program.cs.
+
+   Wires the Blazor Router up to the routed pages (anything decorated with
+   an @page directive) and supplies a fallback NotFound view rendered
+   inside the same MainLayout chrome so the user keeps the nav bar even
+   on a missing route.
+   ---------------------------------------------------------------------- *@
+<Router AppAssembly="@typeof(App).Assembly">
+    @* Found: a route matched a [Route] / @page directive — render the page
+       through MainLayout and move keyboard focus to its <h1> for a11y. *@
     <Found Context="routeData">
         <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)" />
         <FocusOnNavigate RouteData="@routeData" Selector="h1" />
     </Found>
+    @* NotFound: nothing matched. Reuse MainLayout so the chrome (nav bar,
+       footer) stays consistent and the user can recover with a single
+       click rather than landing on a blank page. *@
     <NotFound>
         <PageTitle>Not found</PageTitle>
         <LayoutView Layout="@typeof(MainLayout)">

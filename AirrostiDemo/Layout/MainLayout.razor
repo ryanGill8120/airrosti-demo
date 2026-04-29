@@ -1,8 +1,20 @@
+@* ----------------------------------------------------------------------
+   MainLayout.razor — the chrome that wraps every routed page.
+
+   Everything routed through App.razor's <RouteView> renders inside
+   @Body below, so this is the natural home for the persistent nav bar
+   and any future site-wide footer.
+   ---------------------------------------------------------------------- *@
 @inherits LayoutComponentBase
 
 <div class="app-shell">
+    @* Sticky top nav bar. Renders the brand, primary nav links, and the
+       sign-in / account-area depending on auth state. *@
     <NavMenu />
     <main class="app-main">
+        @* The .container wrapper gives every page a consistent max-width
+           and gutter on desktop, while still letting hero sections inside
+           the page break out as needed. *@
         <article class="content container py-4">
             @Body
         </article>

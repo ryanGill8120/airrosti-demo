@@ -1,3 +1,12 @@
+@* ----------------------------------------------------------------------
+   DrugSearch.razor — the main demo page at "/drugs".
+
+   Anonymous-friendly: anyone can search and view results. Saving a
+   result triggers the auth modal if the visitor isn't already signed
+   in. Calls the server's /api/DrugSideEffects proxy — never FDA
+   directly — so all upstream concerns (rate-limiting, API keys,
+   error translation) stay server-side.
+   ---------------------------------------------------------------------- *@
 @page "/drugs"
 @using System.Net
 @using AirrostiDemo.Shared.OpenFda
@@ -13,12 +22,25 @@
     <a href="https://open.fda.gov/apis/drug/event/" target="_blank" rel="noopener">adverse event reporting system</a>.
 </p>
 
+@* Placeholder for explanatory copy — fill in later. *@
+<div class="alert alert-info" role="alert">
+
+    As a healthcare provider who focuses on non-invasive treatment, Airrosti might want to provide it's patients with information 
+    about the adverse affect of OTC and prescription pain medication. This might encourage prospective patients to opt for targeted 
+    musculoskeletal care rather than reaching for the most readily available drug.
+
+</div>
+
+@* Free-text search input. Pressing Enter triggers a search via OnKey
+   so the user doesn't have to mouse over to the Search button. *@
 <div class="mb-3">
     <label class="form-label" for="drug-input">Drug name</label>
     <input id="drug-input" class="form-control" @bind="drugInput" @bind:event="oninput"
            @onkeydown="OnKey" placeholder="e.g. ibuprofen" />
 </div>
 
+@* Quick-pick buttons populated from the static DemoDrugs list. They
+   bypass the input field and call Search directly with the value. *@
 <div class="mb-3">
     <div class="form-text mb-2">Quick picks:</div>
     @foreach (var drug in DemoDrugs)
@@ -36,6 +58,8 @@
     Search
 </button>
 
+@* Result rendering. Order matters here: the if/else-if cascade ensures
+   we never show stale data alongside a loading spinner or error. *@
 @if (loading)
 {
     <p class="mt-3"><em>Loading...</em></p>
@@ -53,13 +77,25 @@ else if (response is not null)
     }
     else
     {
+        @* Compute the max count once so each row's progress bar can be
+           rendered as a percentage of the most-reported reaction. *@
         var max = response.Results.Max(r => r.Count);
         <table class="table">
             <thead>
                 <tr>
                     <th>Reaction</th>
-                    <th style="width:20%">Reports</th>
-                    <th>Frequency</th>
+                    <th style="width:20%">
+                        Total Reports
+                        <div class="small text-muted fw-normal">
+                            Cumulative count from FDA — not per year or per person
+                        </div>
+                    </th>
+                    <th>
+                        Relative Frequency
+                        <div class="small text-muted fw-normal">
+                            Compared to the other reactions in this list
+                        </div>
+                    </th>
                 </tr>
             </thead>
             <tbody>
@@ -82,6 +118,9 @@ else if (response is not null)
             </tbody>
         </table>
 
+        @* Save action. The button is always enabled when results are
+           visible — we only check auth state inside SaveAsync, and pop
+           the auth modal up if the user isn't signed in yet. *@
         <div class="d-flex align-items-center gap-3 mt-3">
             <button type="button" class="btn btn-success"
                     @onclick="SaveAsync" disabled="@saving">
@@ -97,12 +136,17 @@ else if (response is not null)
     }
 }
 
+@* Auth modal opens in Register mode here because the typical user
+   reaching this point is brand new — they just clicked "Save my
+   results" without an account. The modal still exposes a Login tab. *@
 <AuthModal Show="@showAuthModal"
            StartMode="AuthModalMode.Register"
            OnClose="() => showAuthModal = false"
            OnAuthenticated="OnAuthenticatedAsync" />
 
 @code {
+    /// <summary>Static set of drugs we know FDA has rich data for. Used
+    /// to populate the quick-pick row.</summary>
     private static readonly string[] DemoDrugs = new[]
     {
         "ibuprofen",
@@ -122,10 +166,17 @@ else if (response is not null)
     private bool saving;
     private string? saveStatus;
 
+    /// <summary>
+    /// Fetch reaction counts for the given drug from our server-side
+    /// proxy. Maps each known status code into a friendly user-facing
+    /// message; any other failure falls through to a generic retry hint.
+    /// </summary>
     private async Task Search(string drug)
     {
         if (string.IsNullOrWhiteSpace(drug)) return;
 
+        // Reset all the result state at once so we never show stale data
+        // overlapping a fresh request.
         loading = true;
         error = null;
         response = null;
@@ -134,14 +185,21 @@ else if (response is not null)
 
         try
         {
+            // EscapeDataString handles drug names with spaces /
+            // punctuation (e.g. "advil cold and sinus") cleanly.
             var resp = await Http.GetAsync(
                 $"api/DrugSideEffects/{Uri.EscapeDataString(drug)}");
 
+            // 404: server confirms FDA has no events for this drug.
+            // We surface a clean "not found" message instead of a 5xx.
             if (resp.StatusCode == HttpStatusCode.NotFound)
             {
                 error = "Drug not found.";
                 return;
             }
+            // 503: server signals FDA is throttling/down. The body
+            // includes a retryAfterSeconds hint, but the demo just
+            // tells the user to try again.
             if (resp.StatusCode == HttpStatusCode.ServiceUnavailable)
             {
                 error = "FDA data is temporarily unavailable, please try again shortly.";
@@ -157,6 +215,8 @@ else if (response is not null)
         }
         catch (Exception)
         {
+            // Catch-all for transient network problems. Intentionally
+            // generic — we don't want to leak exception text into the UI.
             error = "Could not fetch data, please try again.";
         }
         finally
@@ -165,6 +225,9 @@ else if (response is not null)
         }
     }
 
+    /// <summary>
+    /// Treat Enter in the search input as a click on the Search button.
+    /// </summary>
     private async Task OnKey(KeyboardEventArgs e)
     {
         if (e.Key == "Enter")
@@ -173,6 +236,11 @@ else if (response is not null)
         }
     }
 
+    /// <summary>
+    /// Top-level "Save my results" handler. If the user isn't signed in
+    /// yet we just show the auth modal — the actual save runs from
+    /// OnAuthenticatedAsync once the modal succeeds.
+    /// </summary>
     private async Task SaveAsync()
     {
         if (response is null) return;
@@ -186,12 +254,23 @@ else if (response is not null)
         await PostReportAsync();
     }
 
+    /// <summary>
+    /// Modal-success callback. We chain straight into the report POST
+    /// so the user's original "save" intent is preserved through the
+    /// auth detour without forcing a second click.
+    /// </summary>
     private async Task OnAuthenticatedAsync()
     {
         showAuthModal = false;
         await PostReportAsync();
     }
 
+    /// <summary>
+    /// POST the current FDA response to /api/Reports for persistence.
+    /// AuthHeaderHandler attaches the bearer token automatically; we
+    /// only need to handle the case where the token has expired between
+    /// authentication checks (401 → log out + reopen modal).
+    /// </summary>
     private async Task PostReportAsync()
     {
         if (response is null) return;
@@ -201,6 +280,9 @@ else if (response is not null)
         try
         {
             var resp = await Http.PostAsJsonAsync("api/Reports", response);
+            // 401 here means the token expired between IsAuthenticatedAsync
+            // and the actual request. Clear the bad session and bring the
+            // modal back up so the user can sign in again.
             if (resp.StatusCode == System.Net.HttpStatusCode.Unauthorized)
             {
                 await Auth.LogoutAsync();
